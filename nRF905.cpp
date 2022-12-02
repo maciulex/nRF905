@@ -138,7 +138,12 @@ namespace nRF905 {
     void clearTxPayload();
     void readTXPayload();
     void printTXPayload();
+    void readRXPayload();
+    void printRXPayload();
 
+    void setTXAddress(uint8_t *data, uint8_t size);
+    void readTXAddress();
+    void printTXAddress();
 
     uint8_t TX_PAYLOAD[32];
     uint8_t RX_PAYLOAD[32];
@@ -146,10 +151,31 @@ namespace nRF905 {
     uint8_t RX_ADDRESS[4];
     uint8_t CONFIG[11];
 
-    bool readyToOperate = false;
     bool powerUp = false;
     bool standBy = false;
     bool RXmode  = false;
+
+    void transmit() {
+        TX_mode();
+        if (!powerUp) powerUpMode(true);
+        standbyMode(false);
+
+        //while (!gpio_get(DATA_READY_PIN)) continue;
+        standbyMode(true);
+        RX_mode();
+        TX_mode();
+    }
+
+    void recive() {
+        RX_mode();
+        if (!powerUp) powerUpMode(true);
+        standbyMode(false);
+
+        while (!gpio_get(DATA_READY_PIN)) continue;
+        standbyMode(true);
+        TX_mode();
+        RX_mode();
+    }
 
     bool TX_mode(bool activate) {
         if (activate) {
@@ -164,7 +190,6 @@ namespace nRF905 {
         if (activate == RXmode) return RXmode;
         
         RXmode = activate;
-        if (!readyToOperate) standbyMode(true);
         if (!RXmode) {
             gpio_put(TX_RX_MODE_PIN, 1);
             sleep_us(1);
@@ -181,9 +206,8 @@ namespace nRF905 {
         
         standBy = state;
         if (!standBy) {
-            gpio_put(STANDBY_PIN, 0);
+            gpio_put(STANDBY_PIN, 1);
             sleep_us(1);
-            readyToOperate = false;
             return false;
         } 
 
@@ -191,7 +215,7 @@ namespace nRF905 {
         if (!powerUp) {
             powerUpMode(true);
             sleep_ms(3);
-            readyToOperate = true;
+
         }
         return true;
     }
@@ -324,6 +348,33 @@ namespace nRF905 {
         }
     }
 
+    void setTXAddress(uint8_t *data, uint8_t size) {
+        for (int i = 0; i < size; i++) {
+            TX_ADDRESS[i] = data[i];
+        }
+        uint8_t command[2] = {COMMAND_W_TX_PAYLOAD, *TX_ADDRESS};
+        startCommand();
+
+        spi_write_blocking(SPI_INTERFACE, command, 5);
+
+        endCommand();
+    }
+
+    void readTXAddress() {
+        uint8_t tmp[5];
+        uint8_t command[5] = {COMMAND_R_TX_ADDRESS, 0xff, 0xff, 0xff, 0xff};
+        startCommand();
+        spi_write_read_blocking(SPI_INTERFACE, command, tmp, 5);
+        endCommand();
+        for (int i = 1; i < 5; i++) TX_ADDRESS[i-1] = tmp[i];
+    }
+
+    void printTXAddress() {
+        printf("TXPayload: ");
+        for (int i = 0; i < 4; i++) printf("\n\t" BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(TX_ADDRESS[i]));
+        printf("\n");
+    }    
+
     void writeTXPayload(uint8_t *data, uint8_t size) {
         for (int i = 0; i < size; i++) {
             TX_PAYLOAD[i] = data[i];
@@ -340,15 +391,37 @@ namespace nRF905 {
         for (int i = 0; i < 32; i++) {
             TX_PAYLOAD[i] = 0;
         }
-        writeTxPayload();
+        writeTXPayload(&TX_PAYLOAD[0], 0);
     }
     
     void readTXPayload() {
-
+        uint8_t tmp[33];
+        uint8_t command[33] = {COMMAND_R_TX_PAYLOAD, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+        startCommand();
+        spi_write_read_blocking(SPI_INTERFACE, command, tmp, 33);
+        endCommand();
+        for (int i = 1; i < 33; i++) TX_PAYLOAD[i-1] = tmp[i];
     }
 
     void printTXPayload() {
+        printf("TXPayload: ");
+        for (int i = 0; i < 32; i++) printf("\n\t" BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(TX_PAYLOAD[i]));
+        printf("\n");
+    }
 
+    void readRXPayload() {
+        uint8_t tmp[33];
+        uint8_t command[33] = {COMMAND_R_RX_PAYLOAD, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+        startCommand();
+        spi_write_read_blocking(SPI_INTERFACE, command, tmp, 33);
+        endCommand();
+        for (int i = 1; i < 33; i++) RX_PAYLOAD[i-1] = tmp[i];
+    }
+
+    void printRXPayload() {
+        printf("TXPayload: ");
+        for (int i = 0; i < 32; i++) printf("\n\t" BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(RX_PAYLOAD[i]));
+        printf("\n");
     }
 
     void setOutputClockFrequency(uint8_t values) {
