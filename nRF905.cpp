@@ -157,79 +157,81 @@ namespace nRF905 {
 
     void transmit() {
         TX_mode();
+        printf("Carrier Detect: %i ADDRES Match %i POWERUP: %i standBy: %i RXmode: %i dataReady: %i \n", gpio_get(CARRIER_DETECT_PIN), gpio_get(ADRESS_MATCH_PIN),powerUp, standBy, RXmode, gpio_get(DATA_READY_PIN));
         if (!powerUp) powerUpMode(true);
         standbyMode(false);
+        printf("Carrier Detect: %i ADDRES Match %i POWERUP: %i standBy: %i RXmode: %i dataReady: %i \n", gpio_get(CARRIER_DETECT_PIN), gpio_get(ADRESS_MATCH_PIN),powerUp, standBy, RXmode, gpio_get(DATA_READY_PIN));
+        while (!gpio_get(DATA_READY_PIN)) continue;
+        printf("Carrier Detect: %i ADDRES Match %i POWERUP: %i standBy: %i RXmode: %i dataReady: %i \n", gpio_get(CARRIER_DETECT_PIN), gpio_get(ADRESS_MATCH_PIN),powerUp, standBy, RXmode, gpio_get(DATA_READY_PIN));
 
-        //while (!gpio_get(DATA_READY_PIN)) continue;
-        standbyMode(true);
         RX_mode();
-        TX_mode();
+        standbyMode(true);
+        printf("Carrier Detect: %i ADDRES Match %i POWERUP: %i standBy: %i RXmode: %i dataReady: %i \n", gpio_get(CARRIER_DETECT_PIN), gpio_get(ADRESS_MATCH_PIN),powerUp, standBy, RXmode, gpio_get(DATA_READY_PIN));
+        printf("\n\n\n");
     }
 
     void recive() {
         RX_mode();
+        printf("Carrier Detect: %i ADDRES Match %i POWERUP: %i standBy: %i RXmode: %i dataReady: %i \n", gpio_get(CARRIER_DETECT_PIN), gpio_get(ADRESS_MATCH_PIN),powerUp, standBy, RXmode, gpio_get(DATA_READY_PIN));
         if (!powerUp) powerUpMode(true);
         standbyMode(false);
-
-        while (!gpio_get(DATA_READY_PIN)) continue;
+        printf("Carrier Detect: %i ADDRES Match %i POWERUP: %i standBy: %i RXmode: %i dataReady: %i \n", gpio_get(CARRIER_DETECT_PIN), gpio_get(ADRESS_MATCH_PIN),powerUp, standBy, RXmode, gpio_get(DATA_READY_PIN));
+        while (!gpio_get(DATA_READY_PIN)) {
+            //printf("Carrier Detect: %i ADDRES Match %i POWERUP: %i standBy: %i RXmode: %i dataReady: %i \n", gpio_get(CARRIER_DETECT_PIN), gpio_get(ADRESS_MATCH_PIN),powerUp, standBy, RXmode, gpio_get(DATA_READY_PIN));
+            
+            // printf("Carrier Detect: %i ADDRES Match %i dataReady: %i \n", gpio_get(CARRIER_DETECT_PIN), gpio_get(ADRESS_MATCH_PIN), gpio_get(DATA_READY_PIN));
+            // sleep_ms(1000);
+        };
         standbyMode(true);
-        TX_mode();
-        RX_mode();
+        printf("Carrier Detect: %i ADDRES Match %i POWERUP: %i standBy: %i RXmode: %i dataReady: %i \n", gpio_get(CARRIER_DETECT_PIN), gpio_get(ADRESS_MATCH_PIN),powerUp, standBy, RXmode, gpio_get(DATA_READY_PIN));
+
     }
 
     bool TX_mode(bool activate) {
+        RXmode = !activate;
         if (activate) {
-            if (RXmode) return !RX_mode(false);
+            gpio_put(TX_RX_MODE_PIN, 1);
+            sleep_ms(1);
             return true;
         }
-        if (RXmode) return false;
-        return !RX_mode(true);
+        gpio_put(TX_RX_MODE_PIN, 0);
+        sleep_ms(1);
+        return false;
     } 
 
     bool RX_mode(bool activate) {
-        if (activate == RXmode) return RXmode;
-        
         RXmode = activate;
-        if (!RXmode) {
-            gpio_put(TX_RX_MODE_PIN, 1);
-            sleep_us(1);
-            return false;
+        if (activate) {
+            gpio_put(TX_RX_MODE_PIN, 0);
+            sleep_ms(1);
+            return true;
         } 
 
-        gpio_put(TX_RX_MODE_PIN, 0);
-        sleep_us(1);
-        return true;
+        gpio_put(TX_RX_MODE_PIN, 1);
+        sleep_ms(1);
+        return false;
     }
 
     bool standbyMode(bool state) {
-        if (state == standBy) return standBy;
-        
         standBy = state;
-        if (!standBy) {
-            gpio_put(STANDBY_PIN, 1);
-            sleep_us(1);
-            return false;
+        if (state) {
+            gpio_put(STANDBY_PIN, 0);
+            sleep_ms(1);
+            return true;
         } 
-
         gpio_put(STANDBY_PIN, 1);
-        if (!powerUp) {
-            powerUpMode(true);
-            sleep_ms(3);
-
-        }
-        return true;
+        sleep_ms(1);
+        return false;
     }
 
     bool powerUpMode(bool state) {
-        if (state == powerUp) return powerUp;
-
         powerUp = state;
-        if (!powerUp) {
-            gpio_put(POWER_UP_PIN, 0);
-            standbyMode(false);
+        if (state) {
+            gpio_put(POWER_UP_PIN, 1);
+            sleep_ms(3);
             return false;
         } 
-        gpio_put(POWER_UP_PIN, 1);
+        gpio_put(POWER_UP_PIN, 0);
         return true;
     }
 
@@ -251,8 +253,9 @@ namespace nRF905 {
     bool readConfig() {
         uint8_t command[11] = {COMMAND_R_CONFIG,255,255,255,255,255,255,255,255,255,255};
         startCommand();
-
-        spi_write_read_blocking(SPI_INTERFACE, command, CONFIG, 11);
+        printf("Bits read: ");
+        int bits = spi_write_read_blocking(SPI_INTERFACE, command, CONFIG, 11);
+        printf("%i\n", bits);
 
         endCommand();
         return true;
@@ -332,12 +335,12 @@ namespace nRF905 {
     }
 
     void setRXPayloadWidth(uint8_t value) {
-        CONFIG[4] = clearBits(CONFIG[4], 0b0001'1111);
+        CONFIG[4] = clearBits(CONFIG[4], 0b1111'1111);
         CONFIG[4] += value;
     }
 
     void setTXPayloadWidth(uint8_t value) {
-        CONFIG[5] = clearBits(CONFIG[5], 0b0001'1111);
+        CONFIG[5] = clearBits(CONFIG[5], 0b1111'1111);
         CONFIG[5] += value;
     }
 
@@ -349,13 +352,19 @@ namespace nRF905 {
     }
 
     void setTXAddress(uint8_t *data, uint8_t size) {
+            printf("\nwulut");
         for (int i = 0; i < size; i++) {
             TX_ADDRESS[i] = data[i];
+            printf("\n\t" BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(data[i]));
+
         }
-        uint8_t command[2] = {COMMAND_W_TX_PAYLOAD, *TX_ADDRESS};
+            printf("\nwulut");
+
+        uint8_t command[5] = {COMMAND_W_TX_ADDRESS, TX_ADDRESS[0], TX_ADDRESS[1], TX_ADDRESS[2], TX_ADDRESS[3]};
+        uint8_t tmp[5];
         startCommand();
 
-        spi_write_blocking(SPI_INTERFACE, command, 5);
+        spi_write_read_blocking(SPI_INTERFACE, command, tmp, 5);
 
         endCommand();
     }
@@ -370,19 +379,27 @@ namespace nRF905 {
     }
 
     void printTXAddress() {
-        printf("TXPayload: ");
+        printf("TXAddress: ");
         for (int i = 0; i < 4; i++) printf("\n\t" BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(TX_ADDRESS[i]));
         printf("\n");
     }    
 
     void writeTXPayload(uint8_t *data, uint8_t size) {
-        for (int i = 0; i < size; i++) {
-            TX_PAYLOAD[i] = data[i];
+        uint8_t tmp[33];
+        uint8_t command[33] = {COMMAND_W_TX_PAYLOAD};
+        for (int i = 1; i < 33; i++) {
+            if (i < size+1) {
+                TX_PAYLOAD[i-1] = data[i-1];
+                command[i] = data[i-1];
+            } else {
+                TX_PAYLOAD[i] = 255;
+                command[i] = 0;
+            }   
         }
-        uint8_t command[2] = {COMMAND_W_TX_PAYLOAD, *TX_PAYLOAD};
+        
         startCommand();
 
-        spi_write_blocking(SPI_INTERFACE, command, 33);
+        spi_write_read_blocking(SPI_INTERFACE, command, tmp, 33);
 
         endCommand();
     }
@@ -396,7 +413,8 @@ namespace nRF905 {
     
     void readTXPayload() {
         uint8_t tmp[33];
-        uint8_t command[33] = {COMMAND_R_TX_PAYLOAD, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+        uint8_t command[33] = {COMMAND_R_TX_PAYLOAD};
+        for (int i = 1; i < 33; i++) command[i] = 0xff;
         startCommand();
         spi_write_read_blocking(SPI_INTERFACE, command, tmp, 33);
         endCommand();
